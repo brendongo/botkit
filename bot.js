@@ -71,9 +71,12 @@ if (!process.env.token) {
 
 var Botkit = require('./lib/Botkit.js');
 var os = require('os');
+var fs = require('fs');
+var parse = require('csv-parse');
 
 var controller = Botkit.slackbot({
-    debug: true,
+    json_file_store: './persistent_storage',
+    // debug: true,
 });
 
 var bot = controller.spawn({
@@ -123,7 +126,7 @@ controller.hears(['what is my name','who am i'],'direct_message,direct_mention,m
 
     controller.storage.users.get(message.user,function(err, user) {
         if (user && user.name) {
-            bot.reply(message,'Your name is ' + user.name);
+            bot.reply(message,'You are ' + user.name);
         } else {
             bot.reply(message,'I don\'t know yet!');
         }
@@ -157,6 +160,22 @@ controller.hears(['shutdown'],'direct_message,direct_mention,mention',function(b
     });
 });
 
+controller.hears(['who is (.*)'],'direct_message,direct_mention',function(bot, message) {
+    var matches = message.text.match(/who is (.*)/i);
+    var name = matches[1];
+
+    var parser = parse({}, function(err, data){
+      var filtered = []
+      for (i = 0; i < data.length; i++) {
+        if (data[i][1].toLowerCase() === name.toLowerCase()) {
+          filtered.push(data[i]);
+        }
+      }
+      bot.reply(message, filtered.toString());
+    });
+
+    fs.createReadStream(__dirname+'/roble.csv').pipe(parser);
+});
 
 controller.hears(['uptime','identify yourself','who are you','what is your name'],'direct_message,direct_mention,mention',function(bot, message) {
 
@@ -165,6 +184,18 @@ controller.hears(['uptime','identify yourself','who are you','what is your name'
 
     bot.reply(message,':robot_face: I am a bot named <@' + bot.identity.name + '>. I have been running for ' + uptime + ' on ' + hostname + '.');
 
+});
+
+controller.hears(['thanks', 'thank you'], 'direct_message,direct_mention,mention', function(bot, message){
+  console.log(message.user);
+
+  controller.storage.users.get(message.user,function(err, user) {
+    if (user && user.name) {
+        bot.reply(message,'My pleasure ' + user.name + '!');
+    } else {
+        bot.reply(message,'No problem!');
+    }
+  });
 });
 
 function formatUptime(uptime) {
